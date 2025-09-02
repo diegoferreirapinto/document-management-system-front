@@ -21,10 +21,11 @@ const Layout = ({ children }) => {
     setMobileOpen(false)
   }
 
-  const drawerWidth = sidebarOpen ? 280 : 60
+  const drawerWidth = sidebarOpen ? 280 : 0
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    // <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex'}}>
       {/* Sidebar */}
       <Sidebar 
         open={sidebarOpen}
@@ -42,9 +43,9 @@ const Layout = ({ children }) => {
           display: 'flex',
           flexDirection: 'column',
           minHeight: '100vh',
-          width: '100%',
           // Ajusta margin apenas no desktop
-          ml: isMobile ? 0 : `${drawerWidth}px`,
+          // ml: isMobile ? 0 : `${drawerWidth}px`,
+          ml: 0,
           transition: theme.transitions.create(['margin'], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,
@@ -57,7 +58,8 @@ const Layout = ({ children }) => {
         <Box
           sx={{
             flexGrow: 1,
-            p: 3,
+            ml: 3,
+            p: 0,
             backgroundColor: 'background.default',
             minHeight: 'calc(100vh - 64px)',
             width: '100%'
