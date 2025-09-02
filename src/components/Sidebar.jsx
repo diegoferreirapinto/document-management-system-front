@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Drawer,
   List,
@@ -39,19 +39,51 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
   const [openAdmin, setOpenAdmin] = useState(false)
   const [popoverAnchor, setPopoverAnchor] = useState(null)
   const [popoverContent, setPopoverContent] = useState(null)
+  const [activeMenu, setActiveMenu] = useState(null)
+  const popoverRef = useRef(null)
+
+  // Calculate popoverOpen state - AGORA VERIFICANDO AMBOS
+  const popoverOpen = Boolean(popoverAnchor) && Boolean(popoverContent) && !open && !isMobile
+
+  // Fechar popover quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+        handlePopoverClose()
+      }
+    }
+
+    if (popoverOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [popoverOpen])
 
   // Auto-abrir menu quando a rota correspondente estiver ativa
   useEffect(() => {
     if (location.pathname.startsWith('/procedures')) {
       setOpenProcedures(true)
+      setActiveMenu('procedures')
     } else if (location.pathname.startsWith('/non-conformities')) {
       setOpenNC(true)
+      setActiveMenu('nc')
     } else if (location.pathname.startsWith('/documents')) {
       setOpenDocs(true)
+      setActiveMenu('docs')
     } else if (location.pathname.startsWith('/admin')) {
       setOpenAdmin(true)
+      setActiveMenu('admin')
     }
   }, [location.pathname])
+
+  useEffect(() => {
+    if (open) {
+      handlePopoverClose()
+    }
+  }, [open])
 
   // Defina os itens do menu aqui
   const menuItems = [
@@ -129,32 +161,60 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
   const handleMenuClick = (item) => {
     if (item.key === 'procedures') {
       setOpenProcedures(!openProcedures)
+      setActiveMenu(openProcedures ? null : 'procedures')
     } else if (item.key === 'nc') {
       setOpenNC(!openNC)
+      setActiveMenu(openNC ? null : 'nc')
     } else if (item.key === 'docs') {
       setOpenDocs(!openDocs)
+      setActiveMenu(openDocs ? null : 'docs')
     } else if (item.key === 'admin') {
       setOpenAdmin(!openAdmin)
+      setActiveMenu(openAdmin ? null : 'admin')
     }
+
+    // Fecha popover se estiver aberto
+    handlePopoverClose()
+  }
+
+  const handleMouseEnter = (event, item) => {
+    // Se sidebar estiver fechado e item tiver subitens, abre popover
+    if (!open && !isMobile && item.subItems) {
+      setPopoverAnchor(event.currentTarget)
+      setPopoverContent(item)
+      setActiveMenu(item.key)
+    }
+    // Se sidebar estiver fechado e item NÃO tiver subitens, fecha qualquer popover aberto
+    else if (!open && !isMobile && !item.subItems) {
+      handlePopoverClose()
+    }
+  }
+
+  const handleMouseLeave = () => {
+    // NÃO faz nada quando mouse sai - popover permanece aberto
+  }
+
+  const handlePopoverMouseEnter = () => {
+    // Quando o mouse entra no popover, mantém aberto
+  }
+
+  const handlePopoverMouseLeave = () => {
+    // NÃO fecha quando mouse sai do popover - deixa aberto para usuário
   }
 
   const handleSubItemClick = (path) => {
     navigate(path)
+    handlePopoverClose()
     if (isMobile) {
       onMobileClose()
     }
   }
 
-  const handlePopoverOpen = (event, item) => {
-    if (!open && !isMobile && item.subItems) {
-      setPopoverAnchor(event.currentTarget)
-      setPopoverContent(item)
-    }
-  }
-
   const handlePopoverClose = () => {
+    // Limpa AMBOS simultaneamente para evitar o quadrado vazio
     setPopoverAnchor(null)
     setPopoverContent(null)
+    setActiveMenu(null)
   }
 
   const isActive = (path) => {
@@ -173,8 +233,8 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
   const drawerContent = (
     <>
       {/* Header com botão de toggle */}
-      <Toolbar 
-        sx={{ 
+      <Toolbar
+        sx={{
           justifyContent: open ? 'space-between' : 'center',
           minHeight: '64px !important',
           px: open ? 2 : 1
@@ -185,7 +245,7 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
             Gestão da Qualidade
           </Typography>
         )}
-        
+
         <IconButton
           onClick={onToggle}
           size="small"
@@ -207,18 +267,16 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
           <React.Fragment key={item.text}>
             {item.subItems ? (
               <>
-                <Tooltip 
-                  title={!open ? item.text : ''} 
-                  placement="right"
-                  arrow
-                >
+                <Tooltip title={!open ? item.text : ''} placement="right" arrow>
                   <ListItemButton
                     onClick={() => open ? handleMenuClick(item) : null}
-                    onMouseEnter={(e) => handlePopoverOpen(e, item)}
+                    onMouseEnter={(e) => handleMouseEnter(e, item)}
+                    onMouseLeave={handleMouseLeave}
                     sx={{
                       borderRadius: 1,
-                      mb: 0.5,
-                      justifyContent: open ? 'initial' : 'center',
+                      m: 0,
+                      // justifyContent: open ? 'initial' : 'center',
+                      justifyContent: 'center',
                       px: open ? 2 : 1,
                       minHeight: 48,
                       bgcolor: isMenuActive(item) ? 'primary.light' : 'transparent',
@@ -229,41 +287,42 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                       }
                     }}
                   >
+
                     <ListItemIcon
                       sx={{
                         minWidth: 0,
-                        mr: open ? 2 : 'auto',
+                        mr: 1,
                         justifyContent: 'center',
                         color: 'inherit'
                       }}
                     >
                       {item.icon}
                     </ListItemIcon>
-                    
+
                     {open && (
                       <>
-                        <ListItemText 
-                          primary={item.text} 
+                        <ListItemText
+                          primary={item.text}
                           sx={{ opacity: open ? 1 : 0 }}
                         />
                         {item.key === 'procedures' ? (openProcedures ? <ExpandLess /> : <ExpandMore />) :
-                         item.key === 'nc' ? (openNC ? <ExpandLess /> : <ExpandMore />) :
-                         item.key === 'docs' ? (openDocs ? <ExpandLess /> : <ExpandMore />) :
-                         item.key === 'admin' ? (openAdmin ? <ExpandLess /> : <ExpandMore />) : null}
+                          item.key === 'nc' ? (openNC ? <ExpandLess /> : <ExpandMore />) :
+                            item.key === 'docs' ? (openDocs ? <ExpandLess /> : <ExpandMore />) :
+                              item.key === 'admin' ? (openAdmin ? <ExpandLess /> : <ExpandMore />) : null}
                       </>
                     )}
                   </ListItemButton>
                 </Tooltip>
 
                 {open && (
-                  <Collapse 
+                  <Collapse
                     in={
                       (item.key === 'procedures' && openProcedures) ||
                       (item.key === 'nc' && openNC) ||
                       (item.key === 'docs' && openDocs) ||
                       (item.key === 'admin' && openAdmin)
-                    } 
-                    timeout="auto" 
+                    }
+                    timeout="auto"
                     unmountOnExit
                   >
                     <List component="div" disablePadding>
@@ -283,9 +342,9 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                           }}
                           onClick={() => handleSubItemClick(subItem.path)}
                         >
-                          <ListItemText 
-                            primary={subItem.text} 
-                            sx={{ 
+                          <ListItemText
+                            primary={subItem.text}
+                            sx={{
                               '& .MuiTypography-root': {
                                 fontSize: '0.875rem'
                               }
@@ -298,18 +357,20 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                 )}
               </>
             ) : (
-              <Tooltip 
-                title={!open ? item.text : ''} 
+              <Tooltip
+                title={!open ? item.text : ''}
                 placement="right"
                 arrow
               >
                 <ListItemButton
                   onClick={() => handleItemClick(item.path)}
+                  onMouseEnter={(e) => handleMouseEnter(e, item)}
+                  onMouseLeave={handleMouseLeave}
                   sx={{
                     borderRadius: 1,
                     mb: 0.5,
-                    justifyContent: open ? 'initial' : 'center',
-                    px: open ? 2 : 1,
+                    justifyContent: 'center',
+                    px: 2,
                     minHeight: 48,
                     bgcolor: isActive(item.path) ? 'primary.main' : 'transparent',
                     color: isActive(item.path) ? 'primary.contrastText' : 'text.primary',
@@ -322,7 +383,7 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                   <ListItemIcon
                     sx={{
                       minWidth: 0,
-                      mr: open ? 2 : 'auto',
+                      mr: 1,
                       justifyContent: 'center',
                       color: 'inherit'
                     }}
@@ -330,8 +391,8 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                     {item.icon}
                   </ListItemIcon>
                   {open && (
-                    <ListItemText 
-                      primary={item.text} 
+                    <ListItemText
+                      primary={item.text}
                       sx={{ opacity: open ? 1 : 0 }}
                     />
                   )}
@@ -354,9 +415,6 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
     </>
   )
 
-  // Popover para mostrar subitems quando sidebar está fechado
-  const popoverOpen = Boolean(popoverAnchor) && !open && !isMobile
-
   return (
     <>
       {/* Desktop Drawer - Permanente */}
@@ -365,6 +423,7 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
           variant="permanent"
           sx={{
             width: drawerWidth,
+            marginRight: 0,
             flexShrink: 0,
             '& .MuiDrawer-paper': {
               width: drawerWidth,
@@ -392,7 +451,7 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
           open={mobileOpen}
           onClose={onMobileClose}
           ModalProps={{
-            keepMounted: true, // Melhor performance no mobile
+            keepMounted: true,
           }}
           sx={{
             '& .MuiDrawer-paper': {
@@ -420,15 +479,24 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
           horizontal: 'left',
         }}
         sx={{
-          pointerEvents: 'none',
           '& .MuiPopover-paper': {
-            pointerEvents: 'auto',
             ml: 1,
+            pointerEvents: 'auto',
+            // Adiciona transição suave para evitar flickering
+            // transition: 'opacity 0.1s ease-in-out'
           }
         }}
+        ref={popoverRef}
+        disableRestoreFocus
+        // Adiciona esta prop para melhor controle
+        keepMounted={false}
       >
         {popoverContent && (
-          <Paper sx={{ p: 1, minWidth: 200 }}>
+          <Paper 
+            sx={{ p: 1, minWidth: 200 }}
+            onMouseEnter={handlePopoverMouseEnter}
+            onMouseLeave={handlePopoverMouseLeave}
+          >
             <Typography variant="subtitle2" sx={{ px: 2, py: 1, fontWeight: 'bold' }}>
               {popoverContent.text}
             </Typography>
@@ -439,7 +507,6 @@ const Sidebar = ({ open, mobileOpen, onToggle, onMobileClose, isMobile }) => {
                   key={subItem.text}
                   onClick={() => {
                     handleSubItemClick(subItem.path)
-                    handlePopoverClose()
                   }}
                   sx={{
                     borderRadius: 1,
